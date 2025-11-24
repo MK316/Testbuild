@@ -6,24 +6,18 @@ from fpdf import FPDF  # make sure `fpdf2` is in requirements.txt
 
 st.set_page_config(page_title="Quiz App", layout="centered")
 
-
 # --------------------------
 # Load CSV
 # --------------------------
 @st.cache_data
 def load_data():
-    # OPTION 1: if your CSV is local in the repo
-    # df = pd.read_csv("pages/questions.csv")
-
-    # OPTION 2: if you use a raw GitHub link (recommended on Hugging Face)
-    CSV_URL = "https://raw.githubusercontent.com/MK316/Testbuild/refs/heads/main/pages/questions.csv"  # <-- put your raw CSV link here
-    df = pd.read_csv(CSV_URL)
-
+    # If your CSV is in pages/questions.csv
+    df = pd.read_csv("https://raw.githubusercontent.com/MK316/Testbuild/refs/heads/main/pages/questions.csv")
+    # If you instead use a GitHub raw link, replace line above with:
+    # df = pd.read_csv("https://raw.githubusercontent.com/USER/REPO/BRANCH/questions.csv")
     return df
 
-
 df = load_data()
-
 
 # --------------------------
 # Initialize session state
@@ -38,7 +32,7 @@ if "chapter_stats" not in st.session_state:
     # chapter_stats = {
     #   chapter: {
     #       "start_time": str,
-    #       "end_time": str or "",
+    #       "end_time": str,
     #       "score": int,
     #       "total_questions": int,
     #       "completed": bool
@@ -57,7 +51,6 @@ if "feedback" not in st.session_state:
 
 if "score" not in st.session_state:
     st.session_state.score = 0
-
 
 # --------------------------
 # Sidebar – user & chapter
@@ -91,9 +84,8 @@ if selected_chapter not in st.session_state.chapter_stats:
 
 chapter_info = st.session_state.chapter_stats[selected_chapter]
 
-
 # --------------------------
-# Reset state when chapter changes
+# Reset question state when chapter changes
 # --------------------------
 if st.session_state.current_chapter != selected_chapter:
     st.session_state.current_chapter = selected_chapter
@@ -106,9 +98,8 @@ if st.session_state.current_chapter != selected_chapter:
     st.session_state.feedback = ""
     st.session_state.score = 0
 
-
 # --------------------------
-# Main title & current question
+# Main title & question
 # --------------------------
 st.title("Interactive Quiz App")
 
@@ -125,21 +116,19 @@ else:
 
     st.markdown(f"### {q['Question']}")
 
-
     # --------------------------
     # Answer checking
     # --------------------------
-    def check_answer(choice_letter):
+    def check_answer(choice_letter: str):
         correct_letter = str(q["Answer"]).strip()
-
         if choice_letter == correct_letter:
-            # Increase score only the first time we mark this question as correct
+            # Simple score logic: count how many times the user eventually got items correct
+            # (If you want per-question uniqueness, we can add a dict later.)
             if st.session_state.feedback != "✅ Correct!":
                 st.session_state.score += 1
             st.session_state.feedback = "✅ Correct!"
         else:
             st.session_state.feedback = "❌ Try again"
-
 
     # --------------------------
     # Option buttons (equal width)
@@ -178,7 +167,6 @@ else:
 
     st.markdown(st.session_state.feedback)
 
-
     # --------------------------
     # Navigation functions
     # --------------------------
@@ -198,7 +186,6 @@ else:
             chapter_info["score"] = st.session_state.score
             chapter_info["total_questions"] = total_questions
             chapter_info["completed"] = True
-
 
     # --------------------------
     # Navigation buttons (blue)
@@ -236,11 +223,11 @@ else:
         f"({percentage:.1f}%)"
     )
 
-
 # --------------------------
 # PDF generation
 # --------------------------
-def generate_pdf():
+def generate_pdf_bytes():
+    """Return PDF as bytes for download_button."""
     if not st.session_state.user_name:
         return None
 
@@ -248,19 +235,17 @@ def generate_pdf():
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
 
+    # Header
     pdf.set_font("Arial", "B", 16)
     pdf.cell(0, 10, "Quiz Practice Report", ln=True)
 
+    # User info
     pdf.set_font("Arial", "", 12)
     pdf.cell(0, 8, f"Name: {st.session_state.user_name}", ln=True)
-    pdf.cell(
-        0,
-        8,
-        f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-        ln=True,
-    )
+    pdf.cell(0, 8, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True)
     pdf.ln(4)
 
+    # Chapter info
     for chap, info in st.session_state.chapter_stats.items():
         pdf.set_font("Arial", "B", 12)
         pdf.cell(0, 8, f"Chapter: {chap}", ln=True)
@@ -278,16 +263,19 @@ def generate_pdf():
         pdf.cell(0, 6, f"End: {end}", ln=True)
         pdf.ln(4)
 
+    # Get raw output from FPDF
     out = pdf.output(dest="S")
 
-    # fpdf2 usually returns bytes, but older versions may return str
-    if isinstance(out, str):
-        pdf_bytes = out.encode("latin-1")
-    else:
+    # fpdf2 usually returns bytes; older versions may return str.
+    if isinstance(out, bytes):
         pdf_bytes = out
+    elif isinstance(out, bytearray):
+        pdf_bytes = bytes(out)
+    else:
+        # Assume str; encode to bytes
+        pdf_bytes = str(out).encode("latin-1", errors="ignore")
 
     return pdf_bytes
-
 
 # --------------------------
 # Sidebar – PDF download
@@ -296,11 +284,11 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("PDF Report")
 
 if st.session_state.user_name:
-    pdf_bytes = generate_pdf()
-    if pdf_bytes:
+    pdf_bytes = generate_pdf_bytes()
+    if pdf_bytes is not None:
         st.sidebar.download_button(
             "Download Report PDF",
-            data=pdf_bytes,
+            data=pdf_bytes,  # guaranteed bytes
             file_name=f"{st.session_state.user_name}_quiz_report.pdf",
             mime="application/pdf",
         )
