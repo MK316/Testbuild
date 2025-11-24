@@ -101,7 +101,7 @@ if st.session_state.current_chapter != selected_chapter:
 # --------------------------
 # Main title & question
 # --------------------------
-st.title("🍰 Phonetics Chapter Quiz App")
+st.markdown("### 🍰 Phonetics Chapter Quiz App")
 
 if total_questions == 0:
     st.warning("No questions found for this chapter.")
