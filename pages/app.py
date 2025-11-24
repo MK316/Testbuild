@@ -6,7 +6,7 @@ import random
 @st.cache_data
 def load_data():
     # Change this to your file name / path
-    df = pd.read_csv("questions.csv")
+    df = pd.read_csv("https://raw.githubusercontent.com/MK316/Testbuild/refs/heads/main/pages/questions.csv")
     return df
 
 df = load_data()
